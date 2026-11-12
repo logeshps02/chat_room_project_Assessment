@@ -3,15 +3,123 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="description" content="A real-time conversation in ChatRooms" />
     <title>Chat · ChatRooms</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/css/styles.css" />
   </head>
-  <body>
-    <!-- Placeholder: the full chat room UI is built in Step 5. -->
-    <main class="login-card">
-      <h1>Chat room</h1>
-      <p class="muted">The chat screen arrives in Step 5.</p>
+  <body class="chat-page">
+    <header class="app-header">
+      <a class="brand header-brand" href="/" aria-label="ChatRooms home">
+        <img src="/favicon.svg" alt="" width="34" height="34" />
+        <span>ChatRooms</span>
+      </a>
+      <div class="header-room" aria-label="Current room">
+        <span class="room-hash" aria-hidden="true">#</span>
+        <span id="room-name">Connecting…</span>
+      </div>
+      <div class="header-actions">
+        <div class="connection-state" id="connection-state" data-state="connecting" role="status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="connection-label">Connecting</span>
+        </div>
+        <button
+          type="button"
+          class="btn btn-quiet users-toggle"
+          id="users-toggle"
+          aria-controls="users-panel"
+          aria-expanded="false"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M16 20v-1.6a3.4 3.4 0 0 0-3.4-3.4H6.4A3.4 3.4 0 0 0 3 18.4V20m16 0v-1.6a3.4 3.4 0 0 0-2.5-3.28M9.5 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm8-3.5a3.5 3.5 0 0 1-2.5 3.35"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span>People</span>
+          <span class="user-count" id="user-count">0</span>
+        </button>
+        <button type="button" class="btn btn-leave" id="leave-button">Leave</button>
+      </div>
+    </header>
+
+    <main class="chat-layout">
+      <aside class="users-panel" id="users-panel" aria-label="Room members">
+        <div class="panel-heading">
+          <div>
+            <h1>People here</h1>
+            <p class="panel-subtitle">Room members</p>
+          </div>
+          <span class="presence-count" id="panel-user-count">0</span>
+        </div>
+        <ul class="users-list" id="users-list" aria-live="polite"></ul>
+        <div class="invite-card">
+          <span class="invite-icon" aria-hidden="true">↗</span>
+          <p>Anyone with this room name can join the conversation.</p>
+        </div>
+      </aside>
+
+      <section class="conversation" aria-label="Chat conversation">
+        <div class="chat-notice" id="chat-notice" role="alert" hidden></div>
+        <div class="messages" id="messages" role="log" aria-label="Messages" aria-live="polite">
+          <div class="empty-state" id="empty-state">
+            <span class="empty-icon" aria-hidden="true">✦</span>
+            <h2>Start the conversation</h2>
+            <p>Say hello. New messages will appear here in real time.</p>
+          </div>
+        </div>
+        <button type="button" class="new-messages" id="new-messages" hidden>
+          New messages <span aria-hidden="true">↓</span>
+        </button>
+        <form class="composer" id="composer">
+          <label class="sr-only" for="message-input">Message</label>
+          <div class="composer-box">
+            <textarea
+              id="message-input"
+              name="message"
+              rows="1"
+              placeholder="Write a message…"
+              aria-describedby="message-hint message-error"
+              disabled
+            ></textarea>
+            <div class="composer-bottom">
+              <span class="composer-hint" id="message-hint"
+                >Enter to send · Shift + Enter for a new line</span
+              >
+              <div class="composer-actions">
+                <span class="char-count" id="char-count" aria-live="polite">0 / 1000</span>
+                <button
+                  type="submit"
+                  class="send-button"
+                  id="send-button"
+                  aria-label="Send message"
+                  disabled
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M21 3 10.5 13.5M21 3l-6.7 18-3.8-7.5L3 9.7 21 3Z"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  <span>Send</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <p class="composer-error" id="message-error" role="alert"></p>
+        </form>
+      </section>
     </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/validation.js"></script>
+    <script src="/js/chat.js"></script>
   </body>
 </html>
