@@ -17,8 +17,8 @@ test.describe('Chat room', () => {
   });
 
   test('joins the room and shows the online member', async ({ page }) => {
-    await joinRoom(page, 'Alice', 'General');
-    await expect(page.locator('#room-name')).toHaveText('General');
+    await joinRoom(page, 'Alice', 'Presence');
+    await expect(page.locator('#room-name')).toHaveText('Presence');
     await expect(page.locator('#user-count')).toHaveText('1');
     await expect(page.locator('#users-list')).toContainText('Alice');
     await expect(page.locator('.empty-state')).toContainText('Start the conversation');
@@ -33,8 +33,8 @@ test.describe('Chat room', () => {
     const alice = await aliceContext.newPage();
     const bob = await bobContext.newPage();
 
-    await joinRoom(alice, 'Alice', 'General');
-    await joinRoom(bob, 'Bob', 'General');
+    await joinRoom(alice, 'Alice', 'Live');
+    await joinRoom(bob, 'Bob', 'Live');
     await expect(alice.locator('#user-count')).toHaveText('2');
     await expect(bob.locator('#users-list')).toContainText('Alice');
 
@@ -58,15 +58,78 @@ test.describe('Chat room', () => {
     const alice = await generalContext.newPage();
     const carol = await randomContext.newPage();
 
-    await joinRoom(alice, 'Alice', 'General');
+    await joinRoom(alice, 'Alice', 'Isolation');
     await joinRoom(carol, 'Carol', 'Random');
-    await alice.locator('#message-input').fill('Only for General');
+    await alice.locator('#message-input').fill('Only for Isolation');
     await alice.locator('#message-input').press('Enter');
-    await expect(alice.locator('.message-bubble')).toContainText('Only for General');
+    await expect(alice.locator('.message-bubble')).toContainText('Only for Isolation');
     await expect(carol.locator('.message-bubble')).toHaveCount(0);
 
     await generalContext.close();
     await randomContext.close();
+  });
+
+  test('a late joiner sees recent messages in chronological order', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const aliceContext = await browser.newContext();
+    const bobContext = await browser.newContext();
+    const alice = await aliceContext.newPage();
+    const bob = await bobContext.newPage();
+
+    await joinRoom(alice, 'Alice', 'History');
+    const input = alice.locator('#message-input');
+    const messages = ['First message', 'Second message', 'Third message'];
+    for (const [index, text] of messages.entries()) {
+      await input.fill(text);
+      await input.press('Enter');
+      await expect(alice.locator('.message-row')).toHaveCount(index + 1);
+    }
+
+    await joinRoom(bob, 'Bob', 'History');
+    await expect(bob.locator('.message-bubble')).toHaveText(messages);
+    await expect(bob.locator('.message-row time')).toHaveCount(3);
+    await expect(bob.locator('.message-row .message-sender')).toHaveText([
+      'Alice',
+      'Alice',
+      'Alice',
+    ]);
+
+    await aliceContext.close();
+    await bobContext.close();
+  });
+
+  test('retained history does not attribute another person’s reused name to the new user', async ({
+    browser,
+  }) => {
+    test.setTimeout(60_000);
+    const aliceContext = await browser.newContext();
+    const bobContext = await browser.newContext();
+    const alice = await aliceContext.newPage();
+    const bob = await bobContext.newPage();
+
+    await joinRoom(alice, 'Alice', 'Ownership');
+    await joinRoom(bob, 'Bob', 'Ownership');
+    await alice.locator('#message-input').fill('Earlier Alice');
+    await alice.locator('#message-input').press('Enter');
+    await expect(bob.locator('.message-bubble')).toHaveText('Earlier Alice');
+
+    await alice.reload();
+    await expect(alice.locator('.connection-state')).toHaveAttribute('data-state', 'connected');
+    await expect(alice.locator('.message-row.is-mine .message-bubble')).toHaveText('Earlier Alice');
+
+    await aliceContext.close();
+    await expect(bob.locator('#users-list')).not.toContainText('Alice');
+    await joinRoom(bob, 'Alice', 'Ownership');
+    const previousMessage = bob.locator('.message-row').filter({ hasText: 'Earlier Alice' });
+    await expect(previousMessage).toBeVisible();
+    await expect(previousMessage).not.toHaveClass(/is-mine/);
+    await expect(previousMessage.locator('.message-sender')).toHaveText('Alice');
+
+    await bob.locator('#message-input').fill('New Alice');
+    await bob.locator('#message-input').press('Enter');
+    await expect(bob.locator('.message-row.is-mine .message-bubble')).toHaveText('New Alice');
+
+    await bobContext.close();
   });
 
   test('shows a new-message shortcut when scrolled up, then jumps to latest', async ({
@@ -174,8 +237,14 @@ test.describe('Chat room', () => {
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   });
 
-  test('reconnects after a temporary network interruption', async ({ page }) => {
-    await page.addInitScript(() => {
+  test('reconnects a duplicate display name and retains its own history', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const aliceContext = await browser.newContext();
+    const duplicateContext = await browser.newContext();
+    const alice = await aliceContext.newPage();
+    const duplicate = await duplicateContext.newPage();
+
+    await duplicate.addInitScript(() => {
       let originalFactory;
       Object.defineProperty(window, 'io', {
         configurable: true,
@@ -194,24 +263,53 @@ test.describe('Chat room', () => {
         },
       });
     });
-    await joinRoom(page, 'Alice', 'Reconnect');
-    await page.evaluate(() => window.__chatTestSocket.io.engine.close());
-    await expect(page.locator('.connection-state')).toHaveAttribute('data-state', 'disconnected');
-    await expect(page.locator('.connection-state')).toHaveAttribute('data-state', 'connected', {
-      timeout: 15_000,
-    });
-    await expect(page.locator('#users-list')).toContainText('Alice');
-    await page.locator('#message-input').fill('I am back');
-    await page.locator('#message-input').press('Enter');
-    await expect(page.locator('.message-bubble')).toHaveText('I am back');
+    await joinRoom(alice, 'Alice', 'Reconnect');
+    await joinRoom(duplicate, 'Alice', 'Reconnect');
+    await expect(duplicate.locator('#users-list')).toContainText('Alice (2)');
+    await duplicate.locator('#message-input').fill('Before reconnect');
+    await duplicate.locator('#message-input').press('Enter');
+    await expect(duplicate.locator('.message-row.is-mine .message-bubble')).toHaveText(
+      'Before reconnect'
+    );
+
+    await duplicate.evaluate(() => window.__chatTestSocket.io.engine.close());
+    await expect(duplicate.locator('.connection-state')).toHaveAttribute(
+      'data-state',
+      'disconnected'
+    );
+    await expect(duplicate.locator('.connection-state')).toHaveAttribute(
+      'data-state',
+      'connected',
+      {
+        timeout: 15_000,
+      }
+    );
+    await expect(duplicate.locator('.message-row.is-mine .message-bubble')).toHaveText(
+      'Before reconnect'
+    );
+    await duplicate.locator('#message-input').fill('I am back');
+    await duplicate.locator('#message-input').press('Enter');
+    await expect(duplicate.locator('.message-bubble')).toHaveText([
+      'Before reconnect',
+      'I am back',
+    ]);
+
+    await aliceContext.close();
+    await duplicateContext.close();
   });
 
   test('leave clears the session and returns to the login page', async ({ page }) => {
     await joinRoom(page, 'Alice', 'Leave');
+    await page.locator('#message-input').fill('Goodbye');
+    await page.locator('#message-input').press('Enter');
+    await expect(page.locator('.message-row.is-mine .message-bubble')).toHaveText('Goodbye');
     await page.getByRole('button', { name: 'Leave' }).click();
     await expect(page).toHaveURL(/\/$/);
-    const session = await page.evaluate(() => sessionStorage.getItem('chatrooms.session'));
-    expect(session).toBeNull();
+    const stored = await page.evaluate(() => [
+      sessionStorage.getItem('chatrooms.session'),
+      sessionStorage.getItem('chatrooms.ownMessageIds'),
+    ]);
+    expect(stored).toEqual([null, null]);
   });
 
   test('chat works at narrow mobile width without horizontal overflow', async ({ page }) => {

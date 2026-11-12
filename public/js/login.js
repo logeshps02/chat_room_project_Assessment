@@ -2,6 +2,7 @@
   'use strict';
 
   const SESSION_KEY = 'chatrooms.session';
+  const OWN_MESSAGE_IDS_KEY = 'chatrooms.ownMessageIds';
   const LAST_NAME_KEY = 'chatrooms.lastName';
   const LAST_ROOM_KEY = 'chatrooms.lastRoom';
 
@@ -11,6 +12,7 @@
   const roomInput = document.getElementById('room');
   const nameError = document.getElementById('name-error');
   const roomError = document.getElementById('room-error');
+  const loginError = document.getElementById('login-error');
 
   function safeGet(storage, key) {
     try {
@@ -52,6 +54,7 @@
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
+    loginError.textContent = '';
     const name = validateName(nameInput.value);
     const room = validateRoom(roomInput.value);
 
@@ -61,7 +64,14 @@
     if (!name.ok) return nameInput.focus();
     if (!room.ok) return roomInput.focus();
 
-    safeSet(sessionStorage, SESSION_KEY, JSON.stringify({ name: name.value, room: room.value }));
+    try {
+      sessionStorage.removeItem(OWN_MESSAGE_IDS_KEY);
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ name: name.value, room: room.value }));
+    } catch (error) {
+      console.warn('Unable to start the chat session:', error);
+      loginError.textContent = 'Browser session storage is unavailable. Please enable it to join.';
+      return;
+    }
     safeSet(localStorage, LAST_NAME_KEY, name.value);
     safeSet(localStorage, LAST_ROOM_KEY, room.value);
     window.location.assign('/chat.html');

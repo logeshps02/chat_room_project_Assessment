@@ -8,7 +8,7 @@ describe('Socket.IO chat', () => {
   });
 
   afterEach(async () => {
-    await server.close();
+    if (server) await server.close();
   });
 
   async function joined(name, room) {
@@ -123,6 +123,69 @@ describe('Socket.IO chat', () => {
     const got = waitFor(b, 'message:new');
     await emitAck(a, 'message:send', { text: 'same room' });
     expect((await got).text).toBe('same room');
+  });
+
+  test('late joiners receive earlier messages in order, without history from other rooms', async () => {
+    const { socket: a } = await joined('Alice', 'general');
+    for (const text of ['one', 'two', 'three']) {
+      expect((await emitAck(a, 'message:send', { text })).ok).toBe(true);
+    }
+
+    const { ack } = await joined('Bob', 'general');
+    expect(ack.history.map((message) => message.text)).toEqual(['one', 'two', 'three']);
+    for (const message of ack.history) {
+      expect(message).toMatchObject({ name: 'Alice', room: 'general', type: 'user' });
+      expect(message.id).toEqual(expect.any(String));
+      expect(Number.isNaN(Date.parse(message.ts))).toBe(false);
+    }
+
+    const { ack: otherRoom } = await joined('Carol', 'random');
+    expect(otherRoom.history).toEqual([]);
+  });
+
+  test('a late joiner receives only the latest 50 messages', async () => {
+    const { socket: a } = await joined('Alice', 'general');
+    for (let i = 1; i <= 60; i += 1) {
+      expect((await emitAck(a, 'message:send', { text: `message ${i}` })).ok).toBe(true);
+    }
+
+    const { ack } = await joined('Bob', 'general');
+    expect(ack.history).toHaveLength(50);
+    expect(ack.history.map((message) => message.text)).toEqual(
+      Array.from({ length: 50 }, (_, index) => `message ${index + 11}`)
+    );
+  }, 15_000);
+
+  test('history survives the last member leaving and is available on rejoin', async () => {
+    const { socket: a } = await joined('Alice', 'General');
+    expect((await emitAck(a, 'message:send', { text: 'still here' })).ok).toBe(true);
+    const serverSocket = server.io.sockets.sockets.get(a.id);
+    expect(serverSocket).toBeDefined();
+    const disconnected = new Promise((resolve) => serverSocket.once('disconnect', resolve));
+    a.disconnect();
+    await disconnected;
+    expect(server.store.getUsers('general')).toEqual([]);
+    expect(server.store.hasRoom('general')).toBe(true);
+
+    const { ack } = await joined('Bob', 'general');
+    expect(ack.room).toBe('General');
+    expect(ack.users).toEqual(['Bob']);
+    expect(ack.history.map((message) => message.text)).toEqual(['still here']);
+  });
+
+  test('closing the server clears retained empty rooms', async () => {
+    const { socket } = await joined('Alice', 'general');
+    const serverSocket = server.io.sockets.sockets.get(socket.id);
+    expect(serverSocket).toBeDefined();
+    const disconnected = new Promise((resolve) => serverSocket.once('disconnect', resolve));
+    socket.disconnect();
+    await disconnected;
+    const store = server.store;
+    expect(store.hasRoom('general')).toBe(true);
+
+    await server.close();
+    server = null;
+    expect(store.hasRoom('general')).toBe(false);
   });
 
   test('invalid join payloads are rejected', async () => {
