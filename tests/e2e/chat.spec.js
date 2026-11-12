@@ -98,6 +98,73 @@ test.describe('Chat room', () => {
     await bobContext.close();
   });
 
+  test('typing indicator is visible only to other members and clears after idle', async ({
+    browser,
+  }) => {
+    const aliceContext = await browser.newContext();
+    const bobContext = await browser.newContext();
+    const alice = await aliceContext.newPage();
+    const bob = await bobContext.newPage();
+    await joinRoom(alice, 'Alice', 'Typing');
+    await joinRoom(bob, 'Bob', 'Typing');
+
+    await alice.locator('#message-input').fill('Still writing');
+    await expect(bob.locator('#typing-indicator')).toHaveText('Alice is typing…');
+    await expect(bob.locator('#typing-indicator')).toBeVisible();
+    await expect(alice.locator('#typing-indicator')).toBeHidden();
+
+    await alice.locator('#message-input').fill('');
+    await expect(bob.locator('#typing-indicator')).toBeHidden();
+
+    await alice.locator('#message-input').fill('This time I will pause');
+    await expect(bob.locator('#typing-indicator')).toHaveText('Alice is typing…');
+    await expect(bob.locator('#typing-indicator')).toBeHidden({ timeout: 5000 });
+
+    await aliceContext.close();
+    await bobContext.close();
+  });
+
+  test('unread tab title counts new messages and resets when the tab is focused', async ({
+    browser,
+  }) => {
+    const aliceContext = await browser.newContext();
+    const bobContext = await browser.newContext();
+    const alice = await aliceContext.newPage();
+    const bob = await bobContext.newPage();
+    await alice.addInitScript(() => {
+      let visibilityState = 'visible';
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => visibilityState,
+      });
+      const browserHasFocus = document.hasFocus.bind(document);
+      document.hasFocus = () => visibilityState === 'visible' && browserHasFocus();
+      window.setTestVisibilityState = (state) => {
+        visibilityState = state;
+        document.dispatchEvent(new Event('visibilitychange'));
+      };
+    });
+    await joinRoom(alice, 'Alice', 'Unread');
+    await joinRoom(bob, 'Bob', 'Unread');
+
+    await alice.evaluate(() => window.setTestVisibilityState('hidden'));
+    await bob.locator('#message-input').fill('First unread');
+    await bob.locator('#message-input').press('Enter');
+    await expect(alice).toHaveTitle('(1) #Unread – ChatRooms');
+
+    await bob.locator('#message-input').fill('Second unread');
+    await bob.locator('#message-input').press('Enter');
+    await expect(alice).toHaveTitle('(2) #Unread – ChatRooms');
+
+    await alice.bringToFront();
+    await alice.evaluate(() => window.setTestVisibilityState('visible'));
+    await expect(alice).toHaveTitle('#Unread · ChatRooms');
+    await expect(alice.locator('.message-bubble')).toHaveText(['First unread', 'Second unread']);
+
+    await aliceContext.close();
+    await bobContext.close();
+  });
+
   test('retained history does not attribute another person’s reused name to the new user', async ({
     browser,
   }) => {
