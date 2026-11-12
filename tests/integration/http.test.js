@@ -34,6 +34,17 @@ describe('HTTP app', () => {
     expect(res.headers['x-powered-by']).toBeUndefined();
   });
 
+  test('sets restrictive browser security headers and a self-only content policy', async () => {
+    const res = await request(app).get('/');
+    expect(res.headers['content-security-policy']).toContain("default-src 'self'");
+    expect(res.headers['content-security-policy']).toContain("script-src 'self'");
+    expect(res.headers['content-security-policy']).toContain("style-src 'self'");
+    expect(res.headers['content-security-policy']).toContain("frame-ancestors 'none'");
+    expect(res.headers['x-frame-options']).toBe('DENY');
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['referrer-policy']).toBeDefined();
+  });
+
   test('serves the shared validation module to the browser', async () => {
     const res = await request(app).get('/js/validation.js');
     expect(res.status).toBe(200);

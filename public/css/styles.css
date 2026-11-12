@@ -635,6 +635,12 @@ input[aria-invalid='true']:focus {
   scroll-behavior: smooth;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .messages {
+    scroll-behavior: auto;
+  }
+}
+
 .empty-state {
   display: flex;
   flex: 1;
@@ -841,7 +847,9 @@ input[aria-invalid='true']:focus {
   max-height: 144px;
   min-height: 32px;
   padding: 5px 2px;
+  overflow-y: auto;
   resize: none;
+  field-sizing: content;
   border: 0;
   outline: 0;
   background: transparent;

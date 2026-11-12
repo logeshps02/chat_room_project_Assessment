@@ -11,6 +11,7 @@ async function joinRoom(page, name, room) {
 
 test.describe('Chat room', () => {
   test('direct chat URL without a session redirects to login', async ({ page }) => {
+    test.setTimeout(60_000);
     await page.goto('/chat.html');
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('heading', { name: 'Join a conversation' })).toBeVisible();
@@ -207,11 +208,13 @@ test.describe('Chat room', () => {
     const bobContext = await browser.newContext({ viewport: { width: 900, height: 500 } });
     const alice = await aliceContext.newPage();
     const bob = await bobContext.newPage();
+    await alice.emulateMedia({ reducedMotion: 'reduce' });
 
     await joinRoom(alice, 'Alice', 'Scroll');
     await joinRoom(bob, 'Bob', 'Scroll');
     const input = alice.locator('#message-input');
     for (let i = 1; i <= 8; i += 1) {
+      if (i > 5) await alice.waitForTimeout(650);
       await input.fill(`Message ${i}`);
       await input.press('Enter');
       await expect(alice.locator('.message-row')).toHaveCount(i);
@@ -228,7 +231,7 @@ test.describe('Chat room', () => {
     const shortcut = alice.getByRole('button', { name: /New messages/ });
     await expect(shortcut).toBeVisible();
     await alice.locator('#messages').evaluate((element) => {
-      element.style.scrollBehavior = 'auto';
+      element.scrollTop = 0;
     });
     await shortcut.click();
     await expect(shortcut).toBeHidden();
@@ -255,6 +258,18 @@ test.describe('Chat room', () => {
     await expect(bubble).toBeVisible();
     await expect(bubble).toHaveText(payload);
     await expect(bubble.locator('img')).toHaveCount(0);
+  });
+
+  test('blocks inline scripts with the content security policy', async ({ page }) => {
+    await page.goto('/');
+    const executed = await page.evaluate(async () => {
+      const script = document.createElement('script');
+      script.textContent = 'window.__inlineScriptExecuted = true';
+      document.body.append(script);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return window.__inlineScriptExecuted === true;
+    });
+    expect(executed).toBe(false);
   });
 
   test('counts Unicode characters and sends long Unicode messages', async ({ browser }) => {

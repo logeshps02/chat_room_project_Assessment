@@ -10,14 +10,14 @@ module.exports = defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    baseURL: `http://127.0.0.1:${PORT}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: 'node src/server.js',
-    url: `http://localhost:${PORT}/health`,
+    url: `http://127.0.0.1:${PORT}/health`,
     env: { PORT: String(PORT) },
     reuseExistingServer: !process.env.CI,
     timeout: 20_000,

@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { validateName, validateRoom, validateMessage } = require('./validation');
+const { createRateLimiter } = require('./rateLimiter');
 
 const TYPING_IDLE_MS = 3000;
 
@@ -7,7 +8,7 @@ function systemMessage(text) {
   return { id: crypto.randomUUID(), text, ts: new Date().toISOString(), type: 'system' };
 }
 
-function registerSocketHandlers(io, store) {
+function registerSocketHandlers(io, store, rateLimiter = createRateLimiter()) {
   function stopTyping(socket) {
     const { name, roomKey, isTyping, typingTimer } = socket.data;
     if (typingTimer) clearTimeout(typingTimer);
@@ -24,7 +25,7 @@ function registerSocketHandlers(io, store) {
     stopTyping(socket);
     const name = store.removeUser(roomKey, socket.id);
     socket.leave(roomKey);
-    socket.data = {};
+    socket.data = { clientIp: socket.data.clientIp };
     if (name) {
       io.to(roomKey).emit('system', systemMessage(`${name} left the room`));
       io.to(roomKey).emit('room:users', { users: store.getUsers(roomKey) });
@@ -32,10 +33,11 @@ function registerSocketHandlers(io, store) {
   }
 
   io.on('connection', (socket) => {
-    socket.data = {};
-
     socket.on('room:join', (payload, ack) => {
       const reply = typeof ack === 'function' ? ack : () => {};
+      if (!rateLimiter.allowJoin(socket.id)) {
+        return reply({ ok: false, error: 'Too many room joins. Try again in a minute.' });
+      }
       const { name, room } = payload && typeof payload === 'object' ? payload : {};
 
       const nameCheck = validateName(name);
@@ -48,7 +50,12 @@ function registerSocketHandlers(io, store) {
       const roomKey = roomCheck.key;
       const joined = store.addUser(roomKey, roomCheck.value, socket.id, nameCheck.value);
       socket.join(roomKey);
-      socket.data = { name: joined.name, roomKey, roomName: joined.roomName };
+      socket.data = {
+        clientIp: socket.data.clientIp,
+        name: joined.name,
+        roomKey,
+        roomName: joined.roomName,
+      };
 
       const users = store.getUsers(roomKey);
       reply({
@@ -67,6 +74,9 @@ function registerSocketHandlers(io, store) {
       const reply = typeof ack === 'function' ? ack : () => {};
       const { name, roomKey, roomName } = socket.data;
       if (!roomKey) return reply({ ok: false, error: 'Join a room first' });
+      if (!rateLimiter.allowMessage(socket.id)) {
+        return reply({ ok: false, error: "You're sending messages too fast" });
+      }
 
       const text = payload && typeof payload === 'object' ? payload.text : undefined;
       const check = validateMessage(text);
@@ -103,7 +113,10 @@ function registerSocketHandlers(io, store) {
       socket.data.typingTimer.unref();
     });
 
-    socket.on('disconnect', () => leaveCurrentRoom(socket));
+    socket.on('disconnect', () => {
+      leaveCurrentRoom(socket);
+      rateLimiter.removeSocket(socket.id);
+    });
   });
 }
 
