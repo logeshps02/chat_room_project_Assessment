@@ -2,11 +2,27 @@
 
 A real-time chat app: people enter a display name, join a room by name, and
 messages (with timestamps) go out live to everyone in that room. It runs on a
-laptop and can be shared over the internet with a Cloudflare Tunnel.
+laptop. Public Cloudflare Tunnel startup is planned for a later implementation step.
 
 Built with **Node.js**, **Express** and **Socket.IO**, with a plain HTML/CSS/JS frontend.
 
-![Login page](docs/screenshots/login-desktop.png)
+## Screenshots
+
+| Login                                             | Chat room                                                  |
+| ------------------------------------------------- | ---------------------------------------------------------- |
+| ![Login page](docs/screenshots/login-desktop.png) | ![Chat room on desktop](docs/screenshots/chat-desktop.png) |
+
+![Chat room on mobile](docs/screenshots/chat-mobile.png)
+
+## Features
+
+- Join a room with a display name; no account required
+- Live room messages with server-generated timestamps shown in local time
+- Online member list, join/leave notices, and automatic socket reconnection
+- Message history for current room members while connected
+- Responsive chat layout with mobile member-list toggle
+- Safe text rendering: user messages are inserted as text, not HTML
+- Enter to send, Shift+Enter for a newline, Unicode-aware 1000-character limit
 
 ## Prerequisites
 

@@ -43,9 +43,9 @@ const shots = {
       [bob, 'Hey Alice, thanks! Is the build green?'],
       [alice, 'Yes – all tests passing ✅\nDeploying to the tunnel now.'],
     ]) {
-      await page.getByLabel('Message').fill(text);
-      await page.getByLabel('Message').press('Enter');
-      await page.waitForTimeout(250);
+      await page.locator('#message-input').fill(text);
+      await page.locator('#message-input').press('Enter');
+      await page.waitForTimeout(500);
     }
     await alice.screenshot({ path: `${OUT}/chat-desktop.png` });
     await bob.screenshot({ path: `${OUT}/chat-mobile.png` });
