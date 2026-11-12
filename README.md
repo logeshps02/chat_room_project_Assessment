@@ -6,6 +6,8 @@ laptop and can be shared over the internet with a Cloudflare Tunnel.
 
 Built with **Node.js**, **Express** and **Socket.IO**, with a plain HTML/CSS/JS frontend.
 
+![Login page](docs/screenshots/login-desktop.png)
+
 ## Prerequisites
 
 | Tool        | Version | Install (Windows)                               |

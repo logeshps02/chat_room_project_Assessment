@@ -3,10 +3,85 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ChatRooms</title>
+    <meta name="description" content="ChatRooms – real-time chat rooms" />
+    <meta name="theme-color" content="#4f46e5" />
+    <title>Sign in · ChatRooms</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/css/styles.css" />
   </head>
-  <body>
-    <h1>ChatRooms</h1>
-    <p>Chat app coming soon.</p>
+  <body class="login-page">
+    <main class="login-shell">
+      <section class="login-hero" aria-hidden="true">
+        <div class="brand brand-light">
+          <img src="/favicon.svg" alt="" width="36" height="36" />
+          <span>ChatRooms</span>
+        </div>
+        <h2 class="hero-title">Conversations that happen in real time.</h2>
+        <ul class="hero-list">
+          <li>Join any room by name – no sign-up needed</li>
+          <li>Messages delivered instantly to everyone in the room</li>
+          <li>Every message timestamped in your local time</li>
+        </ul>
+      </section>
+
+      <section class="login-card" aria-labelledby="login-title">
+        <div class="brand brand-compact">
+          <img src="/favicon.svg" alt="" width="32" height="32" />
+          <span>ChatRooms</span>
+        </div>
+        <h1 id="login-title">Join a conversation</h1>
+        <p class="muted">Choose a display name and a room to start chatting.</p>
+
+        <form id="login-form" novalidate>
+          <div class="field">
+            <label for="name">Display name</label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              autocomplete="nickname"
+              placeholder="e.g. Alex"
+              required
+              aria-describedby="name-hint name-error"
+            />
+            <p id="name-hint" class="hint">Shown next to your messages. Up to 30 characters.</p>
+            <p id="name-error" class="error" role="alert"></p>
+          </div>
+
+          <div class="field">
+            <label for="room">Room</label>
+            <input
+              id="room"
+              name="room"
+              type="text"
+              list="room-suggestions"
+              autocomplete="off"
+              placeholder="e.g. General"
+              required
+              aria-describedby="room-hint room-error"
+            />
+            <datalist id="room-suggestions">
+              <option value="General"></option>
+              <option value="Random"></option>
+              <option value="Tech"></option>
+            </datalist>
+            <div class="chips" role="group" aria-label="Popular rooms">
+              <button type="button" class="chip" data-room="General">#General</button>
+              <button type="button" class="chip" data-room="Random">#Random</button>
+              <button type="button" class="chip" data-room="Tech">#Tech</button>
+            </div>
+            <p id="room-hint" class="hint">Type any name to create or join a room.</p>
+            <p id="room-error" class="error" role="alert"></p>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block">Join chat</button>
+        </form>
+
+        <p class="footnote">No account needed. Anyone in the room can see your messages.</p>
+      </section>
+    </main>
+
+    <script src="/js/validation.js"></script>
+    <script src="/js/login.js"></script>
   </body>
 </html>

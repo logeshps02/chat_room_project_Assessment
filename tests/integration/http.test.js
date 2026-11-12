@@ -33,4 +33,16 @@ describe('HTTP app', () => {
     const res = await request(app).get('/health');
     expect(res.headers['x-powered-by']).toBeUndefined();
   });
+
+  test('serves the shared validation module to the browser', async () => {
+    const res = await request(app).get('/js/validation.js');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/javascript/);
+    expect(res.text).toContain('ChatValidation');
+  });
+
+  test.each(['/css/styles.css', '/js/login.js', '/favicon.svg'])('serves %s', async (url) => {
+    const res = await request(app).get(url);
+    expect(res.status).toBe(200);
+  });
 });

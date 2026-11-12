@@ -23,6 +23,12 @@ module.exports = [
     },
   },
   {
+    files: ['tests/e2e/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.browser },
+    },
+  },
+  {
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       eqeqeq: ['error', 'always'],
