@@ -47,6 +47,23 @@ test.describe('Login page', () => {
     await expect(page.getByLabel('Room', { exact: true })).toHaveValue('Tech');
   });
 
+  test('shows an error instead of joining if session storage is blocked', async ({ page }) => {
+    await page.getByLabel('Display name').fill('Alice');
+    await page.evaluate(() => {
+      Object.defineProperty(window, 'sessionStorage', {
+        configurable: true,
+        get: () => {
+          throw new DOMException('Blocked', 'SecurityError');
+        },
+      });
+    });
+    await page.getByRole('button', { name: 'Join chat' }).click();
+    await expect(page.locator('#login-error')).toHaveText(
+      'Browser session storage is unavailable. Please enable it to join.'
+    );
+    await expect(page).toHaveURL(/\/$/);
+  });
+
   test('valid input via Enter key saves the session and goes to the chat page', async ({
     page,
   }) => {

@@ -2,6 +2,8 @@
   'use strict';
 
   const SESSION_KEY = 'chatrooms.session';
+  const OWN_MESSAGE_IDS_KEY = 'chatrooms.ownMessageIds';
+  const MAX_OWN_MESSAGE_IDS = 50;
   const { MESSAGE_MAX, charLength } = window.ChatValidation;
 
   function readSession() {
@@ -45,6 +47,8 @@
   const usersToggle = document.getElementById('users-toggle');
   let joined = false;
   let currentDay = '';
+  let displayName = session.name;
+  const ownMessageIds = readOwnMessageIds();
 
   document.title = `#${session.room} · ChatRooms`;
   roomName.textContent = session.room;
@@ -58,6 +62,38 @@
   function setNotice(message) {
     chatNotice.textContent = message;
     chatNotice.hidden = !message;
+  }
+
+  function readOwnMessageIds() {
+    try {
+      const saved = sessionStorage.getItem(OWN_MESSAGE_IDS_KEY);
+      if (!saved) return new Set();
+      const ids = JSON.parse(saved);
+      if (!Array.isArray(ids) || !ids.every((id) => typeof id === 'string')) {
+        throw new TypeError('Invalid stored message identifiers');
+      }
+      return new Set(ids.slice(-MAX_OWN_MESSAGE_IDS));
+    } catch (error) {
+      console.warn('Unable to restore message ownership:', error);
+      return new Set();
+    }
+  }
+
+  function rememberOwnMessage(id) {
+    if (typeof id !== 'string') {
+      console.warn('A message arrived without a valid identifier.');
+      return;
+    }
+    ownMessageIds.add(id);
+    if (ownMessageIds.size > MAX_OWN_MESSAGE_IDS) {
+      ownMessageIds.delete(ownMessageIds.values().next().value);
+    }
+    try {
+      sessionStorage.setItem(OWN_MESSAGE_IDS_KEY, JSON.stringify([...ownMessageIds]));
+    } catch (error) {
+      console.warn('Unable to remember message ownership:', error);
+      setNotice('Your messages may not be marked as yours after a refresh.');
+    }
   }
 
   function messageLength(value) {
@@ -127,7 +163,7 @@
       system.append(text);
       messages.append(system);
     } else {
-      const isMine = message.name === session.name;
+      const isMine = ownMessageIds.has(message.id);
       const row = document.createElement('article');
       row.className = `message-row${isMine ? ' is-mine' : ''}`;
       row.dataset.messageId = message.id;
@@ -198,7 +234,7 @@
       online.className = 'user-online';
       online.setAttribute('aria-label', 'online');
       item.append(avatar, label);
-      if (name === session.name) {
+      if (name === displayName) {
         const you = document.createElement('span');
         you.className = 'you-badge';
         you.textContent = 'you';
@@ -227,7 +263,7 @@
         return;
       }
 
-      session.name = response.user.name;
+      displayName = response.user.name;
       session.room = response.room;
       roomName.textContent = response.room;
       document.title = `#${response.room} · ChatRooms`;
@@ -253,7 +289,10 @@
     setConnection('disconnected', 'Reconnecting');
   });
   socket.on('connect_error', () => setConnection('disconnected', 'Connection issue'));
-  socket.on('message:new', appendMessage);
+  socket.on('message:new', (message) => {
+    if (message.name === displayName) rememberOwnMessage(message.id);
+    appendMessage(message);
+  });
   socket.on('system', appendMessage);
   socket.on('room:users', ({ users }) => {
     if (Array.isArray(users)) renderUsers(users);
@@ -331,8 +370,9 @@
     socket.disconnect();
     try {
       sessionStorage.removeItem(SESSION_KEY);
-    } catch {
-      // The session may be unavailable in restricted browser modes.
+      sessionStorage.removeItem(OWN_MESSAGE_IDS_KEY);
+    } catch (error) {
+      console.warn('Unable to clear the chat session:', error);
     }
     window.location.assign('/');
   });

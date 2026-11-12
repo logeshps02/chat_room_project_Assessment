@@ -19,10 +19,21 @@ Built with **Node.js**, **Express** and **Socket.IO**, with a plain HTML/CSS/JS 
 - Join a room with a display name; no account required
 - Live room messages with server-generated timestamps shown in local time
 - Online member list, join/leave notices, and automatic socket reconnection
-- Message history for current room members while connected
+- The latest 50 messages are available to people joining the room
 - Responsive chat layout with mobile member-list toggle
 - Safe text rendering: user messages are inserted as text, not HTML
 - Enter to send, Shift+Enter for a newline, Unicode-aware 1000-character limit
+
+## Message history
+
+Each room keeps its latest 50 messages in memory while the server is running.
+New members see those messages in chronological order. When the last member
+leaves, the room and its history remain available for 10 minutes; joining again
+within that period cancels the expiry. The countdown starts again when the room
+next becomes empty. All history is lost when the server restarts, and anyone who
+knows the room name can join and see its recent messages. Display names are not
+authenticated. Message IDs are stored in the current tab for identifying your
+own messages after a refresh; leaving or starting a new login clears them.
 
 ## Prerequisites
 

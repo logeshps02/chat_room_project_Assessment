@@ -10,6 +10,7 @@ function createServer() {
   const io = new Server(httpServer, { maxHttpBufferSize: 10_000 });
   const store = createStore();
   registerSocketHandlers(io, store);
+  httpServer.on('close', () => store.dispose());
   return { app, httpServer, io, store };
 }
 
