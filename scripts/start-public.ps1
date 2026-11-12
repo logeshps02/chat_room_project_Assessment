@@ -85,6 +85,26 @@ function Get-ProcessRecord($process) {
     }
 }
 
+function Wait-PublicHealth {
+    param([string]$Url, [int]$TimeoutSeconds = 120)
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastError = 'No public health response.'
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $health = Invoke-RestMethod -Uri "$Url/health" -TimeoutSec 4 -ErrorAction Stop
+            if ($health.status -eq 'ok') {
+                return [pscustomobject]@{ Ready = $true; LastError = $null }
+            }
+            $lastError = 'The public health endpoint did not return status ok.'
+        } catch {
+            $lastError = $_.Exception.Message
+        }
+        Start-Sleep -Seconds 1
+    }
+    return [pscustomobject]@{ Ready = $false; LastError = $lastError }
+}
+
 $server = $null
 $tunnel = $null
 try {
@@ -150,7 +170,8 @@ try {
     $state.url = $publicUrl
     Save-State
 
-    Write-Host "`nPublic chat URL: $publicUrl"
+    Write-Host "`nTunnel URL allocated: $publicUrl"
+    Write-Host 'Waiting for public HTTPS readiness. New tunnel DNS can take up to two minutes.'
     Write-Host "Keep this window open. Press Ctrl+C or run npm run stop:public to stop it.`n"
     try {
         Set-Clipboard -Value $publicUrl -ErrorAction Stop
@@ -159,23 +180,13 @@ try {
         Write-Warning "Could not copy the URL to the clipboard: $($_.Exception.Message)"
     }
 
-    $deadline = (Get-Date).AddSeconds(20)
-    $publicReady = $false
-    $lastError = 'No public health response.'
-    while ((Get-Date) -lt $deadline) {
-        try {
-            $health = Invoke-RestMethod -Uri "$publicUrl/health" -TimeoutSec 4 -ErrorAction Stop
-            if ($health.status -eq 'ok') { $publicReady = $true; break }
-            $lastError = 'The public health endpoint did not return status ok.'
-        } catch {
-            $lastError = $_.Exception.Message
-        }
-        Start-Sleep -Seconds 1
-    }
-    if ($publicReady) {
-        Write-Host 'The public health check succeeded.'
+    $publicHealth = Wait-PublicHealth -Url $publicUrl
+    if ($publicHealth.Ready) {
+        Write-Host "Public chat is ready: $publicUrl"
     } else {
-        Write-Warning "Could not verify the public URL from this laptop: $lastError"
+        Write-Warning "Public HTTPS readiness was not confirmed after two minutes: $($publicHealth.LastError)"
+        Write-Host 'The tunnel is still running. Retry the same URL; restarting creates a different hostname.'
+        Write-Host 'If DNS errors persist, test on mobile data or ask your network administrator whether Quick Tunnels are allowed.'
     }
 
     $tunnelReported = $false

@@ -126,9 +126,10 @@ npm.cmd ci          # first setup, or after dependencies change
 npm.cmd run public
 ```
 
-The command starts the app and a Cloudflare Quick Tunnel, prints a public
+The command starts the app and a Cloudflare Quick Tunnel, prints an allocated
 `https://...trycloudflare.com` link, and attempts to copy it to the clipboard.
-Share that link and keep the terminal open. Press **Ctrl+C** to stop, or use a
+It waits up to two minutes for public HTTPS readiness before printing
+`Public chat is ready`. Share that link and keep the terminal open. Press **Ctrl+C** to stop, or use a
 second terminal in the project folder:
 
 ```powershell
@@ -154,6 +155,18 @@ Quick Tunnels have no uptime guarantee and are intended for on-demand use. For
 a stable address, use a Cloudflare named tunnel with your own domain and
 Cloudflare account, or an ngrok account and its configured domain. Do not share
 sensitive messages: room names and display names are not passwords or identities.
+
+### If the public page does not open
+
+A newly allocated tunnel hostname may initially fail DNS lookup. Keep the
+terminal open and retry the same link after a minute or two; restarting creates
+a new hostname and starts that wait again. A clipboard warning only means the
+link must be copied manually.
+
+Open `http://127.0.0.1:3210` locally if you selected port 3210 (otherwise use
+your chosen port). If local chat works but public DNS errors persist, compare
+with a phone on mobile data. An organizational network may restrict Quick
+Tunnel hostnames; ask its administrator rather than changing security settings.
 
 ### Stable-address alternatives
 
