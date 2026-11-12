@@ -1,0 +1,11 @@
+node_modules/
+.env
+coverage/
+playwright-report/
+test-results/
+blob-report/
+*.log
+.cloudflared/
+.run/
+.DS_Store
+Thumbs.db
