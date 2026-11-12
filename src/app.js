@@ -11,6 +11,10 @@ function createApp() {
     res.json({ status: 'ok', uptime: Math.round(process.uptime()) });
   });
 
+  app.get('/js/validation.js', (_req, res) => {
+    res.type('application/javascript').sendFile(path.join(__dirname, 'validation.js'));
+  });
+
   app.use(express.static(PUBLIC_DIR));
 
   app.use('/api', (_req, res) => {
