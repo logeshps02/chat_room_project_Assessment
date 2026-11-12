@@ -1,14 +1,27 @@
 const crypto = require('crypto');
 const { validateName, validateRoom, validateMessage } = require('./validation');
 
+const TYPING_IDLE_MS = 3000;
+
 function systemMessage(text) {
   return { id: crypto.randomUUID(), text, ts: new Date().toISOString(), type: 'system' };
 }
 
 function registerSocketHandlers(io, store) {
+  function stopTyping(socket) {
+    const { name, roomKey, isTyping, typingTimer } = socket.data;
+    if (typingTimer) clearTimeout(typingTimer);
+    socket.data.typingTimer = null;
+    socket.data.isTyping = false;
+    if (isTyping && roomKey) {
+      socket.to(roomKey).emit('typing', { name, isTyping: false });
+    }
+  }
+
   function leaveCurrentRoom(socket) {
     const { roomKey } = socket.data;
     if (!roomKey) return;
+    stopTyping(socket);
     const name = store.removeUser(roomKey, socket.id);
     socket.leave(roomKey);
     socket.data = {};
@@ -67,13 +80,31 @@ function registerSocketHandlers(io, store) {
         ts: new Date().toISOString(),
         type: 'user',
       };
+      stopTyping(socket);
       store.addMessage(roomKey, message);
       io.to(roomKey).emit('message:new', message);
       reply({ ok: true, id: message.id });
+    });
+
+    socket.on('typing', (payload) => {
+      const { name, roomKey, isTyping } = socket.data;
+      if (!roomKey) return;
+      if (!payload || payload.isTyping !== true) {
+        stopTyping(socket);
+        return;
+      }
+
+      if (!isTyping) {
+        socket.data.isTyping = true;
+        socket.to(roomKey).emit('typing', { name, isTyping: true });
+      }
+      if (socket.data.typingTimer) clearTimeout(socket.data.typingTimer);
+      socket.data.typingTimer = setTimeout(() => stopTyping(socket), TYPING_IDLE_MS);
+      socket.data.typingTimer.unref();
     });
 
     socket.on('disconnect', () => leaveCurrentRoom(socket));
   });
 }
 
-module.exports = { registerSocketHandlers };
+module.exports = { registerSocketHandlers, TYPING_IDLE_MS };

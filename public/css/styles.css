@@ -808,6 +808,18 @@ input[aria-invalid='true']:focus {
   background: #fff;
 }
 
+.typing-indicator {
+  min-height: 18px;
+  margin: 0 0 7px 4px;
+  color: #78859a;
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.typing-indicator[hidden] {
+  display: none;
+}
+
 .composer-box {
   padding: 9px 12px 8px;
   border: 1px solid #dfe4ec;

@@ -188,6 +188,90 @@ describe('Socket.IO chat', () => {
     expect(store.hasRoom('general')).toBe(false);
   });
 
+  test('typing events reach room members but not the sender or other rooms', async () => {
+    const { socket: alice } = await joined('Alice', 'general');
+    const { socket: bob } = await joined('Bob', 'general');
+    const { socket: carol } = await joined('Carol', 'random');
+    const aliceEvents = collect(alice, 'typing');
+    const carolEvents = collect(carol, 'typing');
+    const bobStartsTyping = waitFor(bob, 'typing', (event) => event.isTyping === true);
+
+    alice.emit('typing', { isTyping: true });
+    expect(await bobStartsTyping).toEqual({ name: 'Alice', isTyping: true });
+
+    const bobStopsTyping = waitFor(bob, 'typing', (event) => event.isTyping === false);
+    alice.emit('typing', { isTyping: false });
+    expect(await bobStopsTyping).toEqual({ name: 'Alice', isTyping: false });
+    await sleep(100);
+    expect(aliceEvents).toEqual([]);
+    expect(carolEvents).toEqual([]);
+  });
+
+  test('typing is broadcast once per active burst even when true is repeated', async () => {
+    const { socket: alice } = await joined('Alice', 'general');
+    const { socket: bob } = await joined('Bob', 'general');
+    const events = collect(bob, 'typing');
+    const started = waitFor(bob, 'typing', (event) => event.isTyping);
+    for (let i = 0; i < 10; i += 1) alice.emit('typing', { isTyping: true });
+    await started;
+    await sleep(100);
+    expect(events).toEqual([{ name: 'Alice', isTyping: true }]);
+
+    const stopped = waitFor(bob, 'typing', (event) => !event.isTyping);
+    alice.emit('typing', { isTyping: false });
+    await stopped;
+  });
+
+  test('typing state expires after three seconds without an update', async () => {
+    const { socket: alice } = await joined('Alice', 'general');
+    const { socket: bob } = await joined('Bob', 'general');
+    const started = waitFor(bob, 'typing', (event) => event.isTyping);
+    alice.emit('typing', { isTyping: true });
+    await started;
+
+    expect(await waitFor(bob, 'typing', (event) => !event.isTyping, 5000)).toEqual({
+      name: 'Alice',
+      isTyping: false,
+    });
+  }, 7000);
+
+  test('sending a message clears typing state for other members', async () => {
+    const { socket: alice } = await joined('Alice', 'general');
+    const { socket: bob } = await joined('Bob', 'general');
+    const started = waitFor(bob, 'typing', (event) => event.isTyping);
+    alice.emit('typing', { isTyping: true });
+    await started;
+
+    const stopped = waitFor(bob, 'typing', (event) => !event.isTyping);
+    const message = waitFor(bob, 'message:new', (event) => event.text === 'sent');
+    await emitAck(alice, 'message:send', { text: 'sent' });
+    await stopped;
+    await message;
+  });
+
+  test('disconnecting while typing clears the indicator before the leave notice', async () => {
+    const { socket: alice } = await joined('Alice', 'general');
+    const { socket: bob } = await joined('Bob', 'general');
+    const started = waitFor(bob, 'typing', (event) => event.isTyping);
+    alice.emit('typing', { isTyping: true });
+    await started;
+
+    const stopped = waitFor(bob, 'typing', (event) => !event.isTyping);
+    const left = waitFor(bob, 'system', (event) => event.text === 'Alice left the room');
+    alice.disconnect();
+    await stopped;
+    await left;
+  });
+
+  test('typing events from a socket that has not joined a room are ignored', async () => {
+    const { socket: bob } = await joined('Bob', 'general');
+    const events = collect(bob, 'typing');
+    const outsider = await server.connect();
+    outsider.emit('typing', { isTyping: true });
+    await sleep(150);
+    expect(events).toEqual([]);
+  });
+
   test('invalid join payloads are rejected', async () => {
     const s = await server.connect();
     expect(await emitAck(s, 'room:join', { name: '', room: 'r' })).toEqual({

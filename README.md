@@ -19,6 +19,8 @@ Built with **Node.js**, **Express** and **Socket.IO**, with a plain HTML/CSS/JS 
 - Join a room with a display name; no account required
 - Live room messages with server-generated timestamps shown in local time
 - Online member list, join/leave notices, and automatic socket reconnection
+- Room-scoped typing indicators that clear automatically after three seconds
+- Unread message count in the browser tab title, reset when the chat is focused
 - The latest 50 messages are available to people joining the room
 - Responsive chat layout with mobile member-list toggle
 - Safe text rendering: user messages are inserted as text, not HTML
@@ -34,6 +36,18 @@ next becomes empty. All history is lost when the server restarts, and anyone who
 knows the room name can join and see its recent messages. Display names are not
 authenticated. Message IDs are stored in the current tab for identifying your
 own messages after a refresh; leaving or starting a new login clears them.
+
+## Presence
+
+The chat shows a typing indicator to other people in the same room while a
+message is being composed. It clears when the person sends, leaves, disconnects,
+or stops typing for three seconds. The browser sends one start notification per
+typing burst and clears it after idle; the server also expires stale indicators.
+
+When this tab is in the background, incoming messages from other people update
+its title with an unread count, such as `(2) #general – ChatRooms`. Returning
+focus to the chat clears the count. Notifications are local to the open tab and
+are not persisted.
 
 ## Prerequisites
 

@@ -4,6 +4,7 @@
   const SESSION_KEY = 'chatrooms.session';
   const OWN_MESSAGE_IDS_KEY = 'chatrooms.ownMessageIds';
   const MAX_OWN_MESSAGE_IDS = 50;
+  const TYPING_IDLE_MS = 3000;
   const { MESSAGE_MAX, charLength } = window.ChatValidation;
 
   function readSession() {
@@ -45,13 +46,31 @@
   const panelUserCount = document.getElementById('panel-user-count');
   const usersPanel = document.getElementById('users-panel');
   const usersToggle = document.getElementById('users-toggle');
+  const typingIndicator = document.getElementById('typing-indicator');
   let joined = false;
   let currentDay = '';
   let displayName = session.name;
+  let unreadCount = 0;
+  let ownTypingTimer = null;
+  let ownTypingActive = false;
   const ownMessageIds = readOwnMessageIds();
+  const typingUsers = new Set();
 
-  document.title = `#${session.room} · ChatRooms`;
+  updatePageTitle();
   roomName.textContent = session.room;
+
+  function updatePageTitle() {
+    document.title =
+      unreadCount > 0
+        ? `(${unreadCount}) #${session.room} – ChatRooms`
+        : `#${session.room} · ChatRooms`;
+  }
+
+  function clearUnreadCount() {
+    if (document.visibilityState !== 'visible' || !document.hasFocus() || unreadCount === 0) return;
+    unreadCount = 0;
+    updatePageTitle();
+  }
 
   function setConnection(state, label) {
     connectionState.dataset.state = state;
@@ -62,6 +81,51 @@
   function setNotice(message) {
     chatNotice.textContent = message;
     chatNotice.hidden = !message;
+  }
+
+  function renderTypingIndicator() {
+    const names = [...typingUsers];
+    typingIndicator.hidden = names.length === 0;
+    if (names.length === 1) {
+      typingIndicator.textContent = `${names[0]} is typing…`;
+    } else if (names.length === 2) {
+      typingIndicator.textContent = `${names[0]} and ${names[1]} are typing…`;
+    } else if (names.length > 2) {
+      typingIndicator.textContent = 'Several people are typing…';
+    } else {
+      typingIndicator.textContent = '';
+    }
+  }
+
+  function setRemoteTyping(payload) {
+    if (!payload || typeof payload.name !== 'string' || typeof payload.isTyping !== 'boolean')
+      return;
+    if (payload.name === displayName) return;
+    if (payload.isTyping) typingUsers.add(payload.name);
+    else typingUsers.delete(payload.name);
+    renderTypingIndicator();
+  }
+
+  function setOwnTyping(isTyping) {
+    if (!joined || !socket.connected) {
+      if (ownTypingTimer) clearTimeout(ownTypingTimer);
+      ownTypingTimer = null;
+      ownTypingActive = false;
+      return;
+    }
+
+    if (ownTypingTimer) clearTimeout(ownTypingTimer);
+    ownTypingTimer = null;
+
+    if (isTyping) {
+      if (!ownTypingActive) socket.emit('typing', { isTyping: true });
+      ownTypingActive = true;
+      ownTypingTimer = setTimeout(() => setOwnTyping(false), TYPING_IDLE_MS);
+      return;
+    }
+
+    if (ownTypingActive) socket.emit('typing', { isTyping: false });
+    ownTypingActive = false;
   }
 
   function readOwnMessageIds() {
@@ -266,7 +330,9 @@
       displayName = response.user.name;
       session.room = response.room;
       roomName.textContent = response.room;
-      document.title = `#${response.room} · ChatRooms`;
+      typingUsers.clear();
+      renderTypingIndicator();
+      updatePageTitle();
       joined = true;
       setNotice('');
       setConnection('connected', 'Connected');
@@ -286,13 +352,22 @@
   socket.on('connect', joinRoom);
   socket.on('disconnect', () => {
     joined = false;
+    setOwnTyping(false);
+    typingUsers.clear();
+    renderTypingIndicator();
     setConnection('disconnected', 'Reconnecting');
   });
   socket.on('connect_error', () => setConnection('disconnected', 'Connection issue'));
   socket.on('message:new', (message) => {
-    if (message.name === displayName) rememberOwnMessage(message.id);
+    if (message.name === displayName) {
+      rememberOwnMessage(message.id);
+    } else if (document.visibilityState !== 'visible' || !document.hasFocus()) {
+      unreadCount += 1;
+      updatePageTitle();
+    }
     appendMessage(message);
   });
+  socket.on('typing', setRemoteTyping);
   socket.on('system', appendMessage);
   socket.on('room:users', ({ users }) => {
     if (Array.isArray(users)) renderUsers(users);
@@ -304,6 +379,7 @@
   messageInput.addEventListener('input', () => {
     messageError.textContent = '';
     updateComposer();
+    setOwnTyping(Boolean(messageInput.value.trim()));
     messageInput.style.height = 'auto';
     messageInput.style.height = `${Math.min(messageInput.scrollHeight, 144)}px`;
   });
@@ -323,6 +399,7 @@
       updateComposer();
       return;
     }
+    setOwnTyping(false);
     sendButton.disabled = true;
     socket.timeout(5000).emit('message:send', { text }, (error, response) => {
       if (error) {
@@ -364,6 +441,8 @@
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') setUsersPanelOpen(false);
   });
+  document.addEventListener('visibilitychange', clearUnreadCount);
+  window.addEventListener('focus', clearUnreadCount);
 
   document.getElementById('leave-button').addEventListener('click', () => {
     joined = false;
