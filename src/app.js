@@ -7,6 +7,7 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', 1);
   app.use(
     helmet({
       frameguard: { action: 'deny' },

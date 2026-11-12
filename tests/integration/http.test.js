@@ -34,6 +34,10 @@ describe('HTTP app', () => {
     expect(res.headers['x-powered-by']).toBeUndefined();
   });
 
+  test('trusts one proxy when running behind a tunnel', () => {
+    expect(app.get('trust proxy')).toBe(1);
+  });
+
   test('sets restrictive browser security headers and a self-only content policy', async () => {
     const res = await request(app).get('/');
     expect(res.headers['content-security-policy']).toContain("default-src 'self'");

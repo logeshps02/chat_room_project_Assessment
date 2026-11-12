@@ -2,7 +2,7 @@
 
 A real-time chat app: people enter a display name, join a room by name, and
 messages (with timestamps) go out live to everyone in that room. It runs on a
-laptop. Public Cloudflare Tunnel startup is planned for a later implementation step.
+laptop and can be shared over HTTPS with a Cloudflare Quick Tunnel.
 
 Built with **Node.js**, **Express** and **Socket.IO**, with a plain HTML/CSS/JS frontend.
 
@@ -60,7 +60,7 @@ Socket.IO packets larger than 10 KB are rejected. The server does not log messag
 content.
 
 The server binds to `127.0.0.1` by default so it is reachable only from this
-laptop unless exposed through the planned tunnel. When behind Cloudflare Tunnel,
+laptop unless exposed through a tunnel. When behind Cloudflare Tunnel,
 the app uses a valid `CF-Connecting-IP` address for connection limits and falls
 back to the socket's remote address. Room names and display names are not
 authentication; do not use this app for sensitive conversations.
@@ -84,16 +84,57 @@ npm ci
 npm start           # http://127.0.0.1:3000
 ```
 
+## Run publicly from this laptop
+
+Install Node.js and `cloudflared` using the prerequisites above, then open
+PowerShell in the project folder:
+
+```powershell
+npm.cmd ci
+npm.cmd run public
+```
+
+The command starts the app and a Cloudflare Quick Tunnel, prints a public
+`https://...trycloudflare.com` link, and attempts to copy it to the clipboard.
+Share that link and keep the terminal open. Press **Ctrl+C** to stop, or use a
+second terminal in the project folder:
+
+```powershell
+npm.cmd run stop:public
+```
+
+The URL changes each time you start the tunnel. It works only while the laptop,
+app, internet connection, and tunnel are running. Keep the laptop plugged in and
+prevent it from sleeping while hosting. No router port forwarding is required.
+If port 3000 is already in use, stop that server first or choose another port:
+
+```powershell
+$env:PORT = '3210'
+npm.cmd run public
+```
+
+This starts a separate app instance on that port. If `npm.cmd` is not on your
+PATH, reopen PowerShell after installing Node.js or run
+`& 'C:\Program Files\nodejs\npm.cmd' run public`. The script also checks the
+standard Windows installation folder for `cloudflared`.
+
+Quick Tunnels have no uptime guarantee and are intended for on-demand use. For
+a stable address, use a Cloudflare named tunnel with your own domain and
+Cloudflare account, or an ngrok account and its configured domain. Do not share
+sensitive messages: room names and display names are not passwords or identities.
+
 ## Scripts
 
-| Command            | What it does                          |
-| ------------------ | ------------------------------------- |
-| `npm start`        | Start the server                      |
-| `npm run dev`      | Start with auto-restart on changes    |
-| `npm test`         | Unit + integration tests (Jest)       |
-| `npm run test:e2e` | Browser end-to-end tests (Playwright) |
-| `npm run lint`     | ESLint                                |
-| `npm run format`   | Prettier                              |
+| Command               | What it does                          |
+| --------------------- | ------------------------------------- |
+| `npm start`           | Start the server                      |
+| `npm run dev`         | Start with auto-restart on changes    |
+| `npm run public`      | Start the app and a public tunnel     |
+| `npm run stop:public` | Stop the managed app and tunnel       |
+| `npm test`            | Unit + integration tests (Jest)       |
+| `npm run test:e2e`    | Browser end-to-end tests (Playwright) |
+| `npm run lint`        | ESLint                                |
+| `npm run format`      | Prettier                              |
 
 ## Project structure
 

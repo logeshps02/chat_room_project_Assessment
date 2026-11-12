@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "public": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\start-public.ps1",
+    "stop:public": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\stop-public.ps1",
     "test": "jest --runInBand",
     "test:unit": "jest tests/unit",
     "test:int": "jest tests/integration --runInBand",
