@@ -26,6 +26,38 @@ Built with **Node.js**, **Express** and **Socket.IO**, with a plain HTML/CSS/JS 
 - Safe text rendering: user messages are inserted as text, not HTML
 - Enter to send, Shift+Enter for a newline, Unicode-aware 1000-character limit
 
+## Architecture
+
+```text
+Browser(s) -- HTTPS / WebSocket --> Cloudflare Quick Tunnel
+                                      |
+                                      v
+                       Express + Socket.IO on this laptop
+                                      |
+                                      v
+                          In-memory rooms and history
+```
+
+For local use, the browser connects directly to the loopback server without a
+tunnel. The server serves the frontend and `/health`; Socket.IO manages room
+membership and delivers messages. The tunnel makes an outbound connection from
+the laptop and forwards public HTTPS requests to the local app.
+
+## Socket.IO events
+
+| Direction              | Event          | Payload / acknowledgement                                                                     |
+| ---------------------- | -------------- | --------------------------------------------------------------------------------------------- |
+| Client → server        | `room:join`    | `{ name, room }`; acknowledges `{ ok, user, room, users, history }` or `{ ok: false, error }` |
+| Client → server        | `message:send` | `{ text }`; acknowledges `{ ok: true, id }` or `{ ok: false, error }`                         |
+| Client → server        | `typing`       | `{ isTyping: true/false }`                                                                    |
+| Server → room          | `message:new`  | `{ id, room, name, text, ts, type: 'user' }`                                                  |
+| Server → room          | `system`       | `{ id, text, ts, type: 'system' }` for join/leave notices                                     |
+| Server → room          | `room:users`   | `{ users }`, the current display-name list                                                    |
+| Server → other members | `typing`       | `{ name, isTyping }`                                                                          |
+
+Timestamps are server-generated ISO 8601 strings and are displayed in each
+browser's local time. Room names are case-insensitive.
+
 ## Message history
 
 Each room keeps its latest 50 messages in memory while the server is running.
@@ -90,7 +122,7 @@ Install Node.js and `cloudflared` using the prerequisites above, then open
 PowerShell in the project folder:
 
 ```powershell
-npm.cmd ci
+npm.cmd ci          # first setup, or after dependencies change
 npm.cmd run public
 ```
 
@@ -123,6 +155,23 @@ a stable address, use a Cloudflare named tunnel with your own domain and
 Cloudflare account, or an ngrok account and its configured domain. Do not share
 sensitive messages: room names and display names are not passwords or identities.
 
+### Stable-address alternatives
+
+For a Cloudflare named tunnel, start the app locally in one terminal, then use
+another terminal (replace the hostname with a domain in your Cloudflare account):
+
+```powershell
+cloudflared tunnel login
+cloudflared tunnel create chatrooms
+cloudflared tunnel route dns chatrooms chat.example.com
+cloudflared tunnel --url http://127.0.0.1:3000 run chatrooms
+```
+
+For ngrok, install it, configure your account token privately, and run
+`ngrok http 3000` against the local app. Follow ngrok's instructions to use a
+reserved domain. Without the Cloudflare client-IP header, the connection limit
+may apply to all visitors sharing the tunnel's local address.
+
 ## Scripts
 
 | Command               | What it does                          |
@@ -136,6 +185,30 @@ sensitive messages: room names and display names are not passwords or identities
 | `npm run lint`        | ESLint                                |
 | `npm run format`      | Prettier                              |
 
+## Testing
+
+```powershell
+npm.cmd run lint
+npm.cmd run format:check
+npm.cmd test -- --coverage
+npx.cmd playwright install chromium
+npm.cmd run test:e2e -- --workers=1
+```
+
+For a public-session check, open the HTTPS link on the laptop and on a phone
+using mobile data. Join the same room and exchange messages in both directions;
+check timestamps, then join a different room to confirm isolation. Keep the
+laptop awake throughout the check.
+
+## Limitations and roadmap
+
+- There are no accounts, room passwords, moderation, or end-to-end encryption.
+- History is temporary and is lost on server restart; display names can be reused.
+- The public Quick Tunnel URL is temporary and the service depends on the laptop
+  and network remaining online. It is not a guaranteed production deployment.
+- Possible future work includes room access controls, persistent storage, and
+  message moderation.
+
 ## Project structure
 
 ```
@@ -144,3 +217,5 @@ src/      server code (Express app, Socket.IO handlers, store, validation)
 tests/    unit, integration and e2e tests
 scripts/  helper scripts (public hosting)
 ```
+
+Licensed under the [MIT License](./LICENSE).
