@@ -145,6 +145,7 @@ describe('Socket.IO chat', () => {
 
   test('a late joiner receives only the latest 50 messages', async () => {
     const { socket: a } = await joined('Alice', 'general');
+    jest.spyOn(server.rateLimiter, 'allowMessage').mockReturnValue(true);
     for (let i = 1; i <= 60; i += 1) {
       expect((await emitAck(a, 'message:send', { text: `message ${i}` })).ok).toBe(true);
     }
@@ -293,4 +294,67 @@ describe('Socket.IO chat', () => {
     await left;
     expect(server.store.getUsers('general')).toEqual(['Alice']);
   });
+
+  test('limits each socket to five messages per three seconds', async () => {
+    const { socket } = await joined('Alice', 'rate-limited');
+    const messages = collect(socket, 'message:new');
+    const results = await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        emitAck(socket, 'message:send', { text: `message ${i}` })
+      )
+    );
+    expect(results.filter((result) => result.ok)).toHaveLength(5);
+    expect(results.filter((result) => !result.ok)).toHaveLength(15);
+    expect(
+      results
+        .filter((result) => !result.ok)
+        .every((result) => result.error === "You're sending messages too fast")
+    ).toBe(true);
+    expect(messages).toHaveLength(5);
+    await sleep(600);
+    expect((await emitAck(socket, 'message:send', { text: 'refilled token' })).ok).toBe(true);
+  });
+
+  test('limits each socket to ten room joins per minute', async () => {
+    const socket = await server.connect();
+    for (let i = 0; i < 10; i += 1) {
+      expect((await emitAck(socket, 'room:join', { name: 'Alice', room: `room-${i}` })).ok).toBe(
+        true
+      );
+    }
+    expect(await emitAck(socket, 'room:join', { name: 'Alice', room: 'room-11' })).toEqual({
+      ok: false,
+      error: 'Too many room joins. Try again in a minute.',
+    });
+  });
+
+  test('rejects browser connections with a different origin', async () => {
+    await expect(
+      server.connect({ extraHeaders: { Origin: 'https://attacker.example' } })
+    ).rejects.toThrow();
+    expect(server.io.sockets.sockets.size).toBe(0);
+  });
+
+  test('caps simultaneous connections from one client IP and restores capacity', async () => {
+    const sockets = [];
+    for (let i = 0; i < 20; i += 1) sockets.push(await server.connect());
+    await expect(server.connect()).rejects.toThrow();
+    expect(server.io.sockets.sockets.size).toBe(20);
+
+    const acceptedSocket = server.io.sockets.sockets.get(sockets[0].id);
+    const disconnected = new Promise((resolve) => acceptedSocket.once('disconnect', resolve));
+    sockets[0].disconnect();
+    await disconnected;
+    expect(await server.connect()).toBeDefined();
+  }, 15_000);
+
+  test('closes a connection whose Socket.IO packet exceeds ten kilobytes', async () => {
+    const { socket } = await joined('Alice', 'payload');
+    const disconnected = waitFor(socket, 'disconnect', () => true, 5000);
+    socket.emit('message:send', { text: 'x'.repeat(50_000) });
+    expect(await disconnected).toEqual(expect.any(String));
+    const response = await fetch(`${server.url}/health`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ status: 'ok' });
+  }, 7000);
 });

@@ -1,11 +1,33 @@
 const path = require('path');
 const express = require('express');
+const helmet = require('helmet');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
 function createApp() {
   const app = express();
   app.disable('x-powered-by');
+  app.use(
+    helmet({
+      frameguard: { action: 'deny' },
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          baseUri: ["'self'"],
+          connectSrc: ["'self'", 'ws:', 'wss:'],
+          fontSrc: ["'self'"],
+          formAction: ["'self'"],
+          frameAncestors: ["'none'"],
+          imgSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          scriptSrc: ["'self'"],
+          scriptSrcAttr: ["'none'"],
+          styleSrc: ["'self'"],
+          upgradeInsecureRequests: null,
+        },
+      },
+    })
+  );
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', uptime: Math.round(process.uptime()) });

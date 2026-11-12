@@ -380,8 +380,6 @@
     messageError.textContent = '';
     updateComposer();
     setOwnTyping(Boolean(messageInput.value.trim()));
-    messageInput.style.height = 'auto';
-    messageInput.style.height = `${Math.min(messageInput.scrollHeight, 144)}px`;
   });
 
   messageInput.addEventListener('keydown', (event) => {
@@ -409,7 +407,6 @@
           response && response.error ? response.error : 'Message could not be sent.';
       } else if (messageInput.value === text) {
         messageInput.value = '';
-        messageInput.style.height = 'auto';
         messageError.textContent = '';
       }
       updateComposer();

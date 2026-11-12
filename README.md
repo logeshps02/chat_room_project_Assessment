@@ -49,6 +49,22 @@ its title with an unread count, such as `(2) #general – ChatRooms`. Returning
 focus to the chat clears the count. Notifications are local to the open tab and
 are not persisted.
 
+## Security and usage limits
+
+The server applies Helmet security headers, including a Content Security Policy
+that permits scripts and styles only from this app. Socket.IO accepts requests
+from the same host only (or clients that omit an Origin header, such as the test
+client). Each connection is limited to five messages per three seconds and ten
+room joins per minute; each client IP may hold up to 20 simultaneous connections.
+Socket.IO packets larger than 10 KB are rejected. The server does not log message
+content.
+
+The server binds to `127.0.0.1` by default so it is reachable only from this
+laptop unless exposed through the planned tunnel. When behind Cloudflare Tunnel,
+the app uses a valid `CF-Connecting-IP` address for connection limits and falls
+back to the socket's remote address. Room names and display names are not
+authentication; do not use this app for sensitive conversations.
+
 ## Prerequisites
 
 | Tool        | Version | Install (Windows)                               |
@@ -65,7 +81,7 @@ are not persisted.
 git clone https://github.com/logeshps02/chat_room_project_Assessment.git
 cd chat_room_project_Assessment
 npm ci
-npm start           # http://localhost:3000
+npm start           # http://127.0.0.1:3000
 ```
 
 ## Scripts
