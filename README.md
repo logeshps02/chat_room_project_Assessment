@@ -158,6 +158,11 @@ sensitive messages: room names and display names are not passwords or identities
 
 ### If the public page does not open
 
+Startup allows up to two minutes for the local app to respond before creating
+the tunnel. If it still reports `The app did not become ready`, check
+`.run/server.stdout.log` and `.run/server.stderr.log` for server errors before
+retrying.
+
 A newly allocated tunnel hostname may initially fail DNS lookup. Keep the
 terminal open and retry the same link after a minute or two; restarting creates
 a new hostname and starts that wait again. A clipboard warning only means the
