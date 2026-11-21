@@ -116,7 +116,8 @@ try {
     Save-State
 
     $healthUrl = "http://127.0.0.1:$Port/health"
-    $deadline = (Get-Date).AddSeconds(30)
+    Write-Host 'Waiting for the local app to become ready (up to two minutes).'
+    $deadline = (Get-Date).AddSeconds(120)
     $ready = $false
     $lastError = 'No health response.'
     while ((Get-Date) -lt $deadline) {
